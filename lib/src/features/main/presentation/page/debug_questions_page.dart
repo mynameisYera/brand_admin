@@ -148,84 +148,60 @@ class _DebugQuestionsPageState extends State<DebugQuestionsPage> {
               children: [
                 RefreshIndicator(
                   onRefresh: () => _loadQuestions(page: _currentPage),
-                  child: ListView(
+                  child: ListView.builder(
                     padding: const EdgeInsets.fromLTRB(16, 16, 16, 120),
-                    children: [
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(14),
-                        decoration: BoxDecoration(
-                          color: AppColors.white,
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(
-                            color: AppColors.grey.withOpacity(0.45),
-                          ),
-                        ),
-                        child: Text(
-                          'Сұрақтар $_currentPage/$_totalPages',
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ),
-                      const Gap(12),
-                      if (_error != null && _questions.isNotEmpty)
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: 8),
-                          child: Text(
-                            _error!,
-                            style: const TextStyle(color: AppColors.red),
-                          ),
-                        ),
-                      if (!hasQuestions && !_isLoading)
-                        const Center(child: Text('Сұрақтар табылмады')),
-                      if (hasQuestions)
-                        Align(
-                          alignment: Alignment.topCenter,
-                          child: ConstrainedBox(
-                            constraints: BoxConstraints(
-                              maxWidth: double.infinity,
-                            ),
-                            child: Container(
-                              padding: const EdgeInsets.all(10),
+                    itemCount: hasQuestions ? _questions.length + 1 : 1,
+                    itemBuilder: (context, index) {
+                      if (index == 0) {
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.all(14),
                               decoration: BoxDecoration(
                                 color: AppColors.white,
-                                borderRadius: BorderRadius.circular(12),
+                                borderRadius: BorderRadius.circular(14),
                                 border: Border.all(
-                                  color: Colors.black.withOpacity(0.65),
-                                  width: 1.2,
+                                  color: AppColors.grey.withOpacity(0.45),
                                 ),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withOpacity(0.04),
-                                    blurRadius: 12,
-                                    offset: const Offset(0, 4),
-                                  ),
-                                ],
                               ),
-                              child: Column(
-                                children: _questions.asMap().entries.map((
-                                  entry,
-                                ) {
-                                  return Padding(
-                                    padding: EdgeInsets.only(
-                                      bottom: entry.key == _questions.length - 1
-                                          ? 0
-                                          : 12,
-                                    ),
-                                    child: _QuestionCard(
-                                      index: entry.key + 1,
-                                      question: entry.value,
-                                      selectedTypeCode: widget.questionType,
-                                    ),
-                                  );
-                                }).toList(),
+                              child: Text(
+                                'Сұрақтар $_currentPage/$_totalPages',
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w700,
+                                ),
                               ),
                             ),
-                          ),
+                            const Gap(12),
+                            if (_error != null && _questions.isNotEmpty)
+                              Padding(
+                                padding: const EdgeInsets.only(bottom: 8),
+                                child: Text(
+                                  _error!,
+                                  style: const TextStyle(color: AppColors.red),
+                                ),
+                              ),
+                            if (!hasQuestions && !_isLoading)
+                              const Center(child: Text('Сұрақтар табылмады')),
+                            if (hasQuestions) const SizedBox(height: 4),
+                          ],
+                        );
+                      }
+
+                      final qIndex = index - 1;
+                      return Padding(
+                        padding: EdgeInsets.only(
+                          bottom: qIndex == _questions.length - 1 ? 0 : 12,
                         ),
-                    ],
+                        child: _QuestionCard(
+                          index: qIndex + 1,
+                          question: _questions[qIndex],
+                          selectedTypeCode: widget.questionType,
+                        ),
+                      );
+                    },
                   ),
                 ),
                 if (hasQuestions)
@@ -321,10 +297,13 @@ class _SiteStylePagination extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final width = (screenWidth - 32).clamp(220.0, 360.0).toDouble();
+
     return Container(
-      width: 200,
+      width: width,
       constraints: const BoxConstraints(maxWidth: 360),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
         color: AppColors.white,
         borderRadius: BorderRadius.circular(14),
@@ -347,7 +326,7 @@ class _SiteStylePagination extends StatelessWidget {
           Text(
             isLoading ? '...' : '$currentApiPage / $totalApiPages',
             style: const TextStyle(
-              fontSize: 20,
+              fontSize: 18,
               fontWeight: FontWeight.w700,
               color: AppColors.black,
             ),
@@ -571,7 +550,12 @@ class _QuestionCard extends StatelessWidget {
         return [
           _htmlBlock(promptHtml),
           const Gap(8),
-          ..._buildMatchingRows(matchingRows),
+          ..._buildMatchingRows(matchingRows, options),
+          if (matchingRows.isNotEmpty) const Gap(8),
+          Text(
+            'Барлық жауаптар',
+            style: TextStyle(fontWeight: FontWeight.w600),
+          ),
           if (matchingRows.isNotEmpty) const Gap(8),
           ..._buildOptions(options),
         ];
@@ -604,22 +588,25 @@ class _QuestionCard extends StatelessWidget {
             padding: const EdgeInsets.only(bottom: 8),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(8),
-              child: Image.network(
-                url,
-                fit: BoxFit.contain,
-                webHtmlElementStrategy: WebHtmlElementStrategy.prefer,
-                loadingBuilder: (_, child, progress) {
-                  if (progress == null) return child;
-                  return const Padding(
-                    padding: EdgeInsets.all(12),
-                    child: SizedBox(
-                      height: 24,
-                      width: 24,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    ),
-                  );
-                },
-                errorBuilder: (_, __, ___) => _ImageLoadFallback(url: url),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxHeight: 320),
+                child: Image.network(
+                  url,
+                  fit: BoxFit.contain,
+                  webHtmlElementStrategy: WebHtmlElementStrategy.prefer,
+                  loadingBuilder: (_, child, progress) {
+                    if (progress == null) return child;
+                    return const Padding(
+                      padding: EdgeInsets.all(12),
+                      child: SizedBox(
+                        height: 24,
+                        width: 24,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                    );
+                  },
+                  errorBuilder: (_, __, ___) => _ImageLoadFallback(url: url),
+                ),
               ),
             ),
           ),
@@ -640,17 +627,32 @@ class _QuestionCard extends StatelessWidget {
           '';
       final label = _stringFrom(option['label']) ?? _stringFrom(option['code']);
       return Container(
-        margin: const EdgeInsets.only(bottom: 6),
-        padding: const EdgeInsets.all(10),
+        margin: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: AppColors.backgroundGrey,
-          borderRadius: BorderRadius.circular(8),
+          color: const Color(0xFFF8F9FB),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: const Color(0xFFE8EBF2)),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             if (label != null && label.isNotEmpty)
-              Text(label, style: const TextStyle(fontWeight: FontWeight.w600)),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: AppColors.white,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: const Color(0xFFE1E5EE)),
+                ),
+                child: Text(
+                  label,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textExtraGrey,
+                  ),
+                ),
+              ),
             if (label != null && label.isNotEmpty) const Gap(4),
             _htmlBlock(optionHtml),
           ],
@@ -659,36 +661,92 @@ class _QuestionCard extends StatelessWidget {
     }).toList();
   }
 
-  List<Widget> _buildMatchingRows(List<Map<String, dynamic>> rows) {
+  List<Widget> _buildMatchingRows(
+    List<Map<String, dynamic>> rows,
+    List<Map<String, dynamic>> options,
+  ) {
     if (rows.isEmpty) return [const SizedBox.shrink()];
+
+    final optionById = <int, Map<String, dynamic>>{};
+    for (final option in options) {
+      final id = _toInt(option['id']);
+      if (id != null) {
+        optionById[id] = option;
+      }
+    }
+
     return rows.map((row) {
       final left =
           _stringFrom(row['left_html']) ??
           _stringFrom(row['left']) ??
           _stringFrom(row['prompt_html']) ??
           '';
+      final correctOptionId = _toInt(row['correct_option_id']);
+      final matchedOption = correctOptionId == null
+          ? null
+          : optionById[correctOptionId];
+
       final right =
+          _stringFrom(matchedOption?['option_html']) ??
+          _stringFrom(matchedOption?['label_html']) ??
+          _stringFrom(matchedOption?['content']) ??
+          _stringFrom(matchedOption?['text']) ??
           _stringFrom(row['right_html']) ??
           _stringFrom(row['right']) ??
           _stringFrom(row['answer_html']) ??
           '';
 
       return Container(
-        margin: const EdgeInsets.only(bottom: 6),
-        padding: const EdgeInsets.all(10),
+        margin: const EdgeInsets.only(bottom: 10),
+        padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: AppColors.backgroundGrey,
-          borderRadius: BorderRadius.circular(8),
+          color: const Color(0xFFF4F6FA),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: const Color(0xFFE3E8F2)),
         ),
         child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            Expanded(child: _htmlBlock(left)),
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 8),
-              child: Icon(Icons.arrow_forward, size: 16),
+            Expanded(
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 8,
+                ),
+                decoration: BoxDecoration(
+                  color: AppColors.white,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: _htmlBlock(left),
+              ),
             ),
-            Expanded(child: _htmlBlock(right)),
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 10),
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: AppColors.white,
+                  shape: BoxShape.circle,
+                ),
+                child: Padding(
+                  padding: EdgeInsets.all(6),
+                  child: Icon(Icons.arrow_forward, size: 14),
+                ),
+              ),
+            ),
+            Expanded(
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 8,
+                ),
+                decoration: BoxDecoration(
+                  color: AppColors.white,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: const Color(0xFFD8DEEB)),
+                ),
+                child: _htmlBlock(right),
+              ),
+            ),
           ],
         ),
       );
