@@ -434,6 +434,125 @@ class _ImageLoadFallback extends StatelessWidget {
   }
 }
 
+class _ImagePreview extends StatelessWidget {
+  const _ImagePreview({required this.imageUrl, required this.onTap});
+
+  final String imageUrl;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(10),
+        child: Ink(
+          decoration: BoxDecoration(
+            color: const Color(0xFFF5F7FB),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: const Color(0xFFE3E8F2)),
+          ),
+          child: Column(
+            children: [
+              SizedBox(
+                height: 140,
+                width: double.infinity,
+                child: ClipRRect(
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(10),
+                  ),
+                  child: Image.network(
+                    imageUrl,
+                    fit: BoxFit.contain,
+                    webHtmlElementStrategy: WebHtmlElementStrategy.prefer,
+                    loadingBuilder: (_, child, progress) {
+                      if (progress == null) return child;
+                      return const Center(
+                        child: SizedBox(
+                          height: 22,
+                          width: 22,
+                          child: CircularProgressIndicator(strokeWidth: 2.2),
+                        ),
+                      );
+                    },
+                    errorBuilder: (_, __, ___) =>
+                        _ImageLoadFallback(url: imageUrl),
+                  ),
+                ),
+              ),
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.open_in_full_rounded,
+                      size: 15,
+                      color: AppColors.textExtraGrey,
+                    ),
+                    Gap(6),
+                    Text(
+                      'Открыть в полный экран',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: AppColors.textExtraGrey,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _FullScreenImagePage extends StatelessWidget {
+  const _FullScreenImagePage({required this.imageUrl});
+
+  final String imageUrl;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        backgroundColor: Colors.black,
+        foregroundColor: Colors.white,
+        surfaceTintColor: Colors.black,
+        title: const Text('Фото'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.open_in_new),
+            onPressed: () async {
+              final uri = Uri.tryParse(imageUrl);
+              if (uri == null) return;
+              await launchUrl(uri, mode: LaunchMode.externalApplication);
+            },
+          ),
+        ],
+      ),
+      body: InteractiveViewer(
+        minScale: 1,
+        maxScale: 5,
+        child: Center(
+          child: Image.network(
+            imageUrl,
+            fit: BoxFit.contain,
+            webHtmlElementStrategy: WebHtmlElementStrategy.prefer,
+            errorBuilder: (_, __, ___) =>
+                Center(child: _ImageLoadFallback(url: imageUrl)),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _QuestionCard extends StatelessWidget {
   const _QuestionCard({
     required this.index,
@@ -511,6 +630,7 @@ class _QuestionCard extends StatelessWidget {
           ),
           const Gap(8),
           ..._buildByType(
+            context: context,
             typeCode: typeCode,
             promptHtml: promptHtml,
             contextBody: contextBody,
@@ -523,6 +643,7 @@ class _QuestionCard extends StatelessWidget {
   }
 
   List<Widget> _buildByType({
+    required BuildContext context,
     required String typeCode,
     required String promptHtml,
     required String? contextBody,
@@ -533,42 +654,42 @@ class _QuestionCard extends StatelessWidget {
       case 'single':
       case 'multiple':
         return [
-          _htmlBlock(promptHtml),
+          _htmlBlock(context, promptHtml),
           const Gap(8),
-          ..._buildOptions(options),
+          ..._buildOptions(context, options),
         ];
       case 'context_single':
         return [
           if (contextBody != null && contextBody.isNotEmpty)
-            _htmlBlock(contextBody),
+            _htmlBlock(context, contextBody),
           if (contextBody != null && contextBody.isNotEmpty) const Gap(8),
-          _htmlBlock(promptHtml),
+          _htmlBlock(context, promptHtml),
           const Gap(8),
-          ..._buildOptions(options),
+          ..._buildOptions(context, options),
         ];
       case 'matching':
         return [
-          _htmlBlock(promptHtml),
+          _htmlBlock(context, promptHtml),
           const Gap(8),
-          ..._buildMatchingRows(matchingRows, options),
+          ..._buildMatchingRows(context, matchingRows, options),
           if (matchingRows.isNotEmpty) const Gap(8),
           Text(
             'Барлық жауаптар',
             style: TextStyle(fontWeight: FontWeight.w600),
           ),
           if (matchingRows.isNotEmpty) const Gap(8),
-          ..._buildOptions(options),
+          ..._buildOptions(context, options),
         ];
       default:
         return [
-          _htmlBlock(promptHtml),
+          _htmlBlock(context, promptHtml),
           const Gap(8),
-          ..._buildOptions(options),
+          ..._buildOptions(context, options),
         ];
     }
   }
 
-  Widget _htmlBlock(String html) {
+  Widget _htmlBlock(BuildContext context, String html) {
     if (html.isEmpty) return const SizedBox.shrink();
     final imageUrls = <String>{
       ..._extractImageUrls(html),
@@ -586,28 +707,15 @@ class _QuestionCard extends StatelessWidget {
         ...imageUrls.map(
           (url) => Padding(
             padding: const EdgeInsets.only(bottom: 8),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxHeight: 320),
-                child: Image.network(
-                  url,
-                  fit: BoxFit.contain,
-                  webHtmlElementStrategy: WebHtmlElementStrategy.prefer,
-                  loadingBuilder: (_, child, progress) {
-                    if (progress == null) return child;
-                    return const Padding(
-                      padding: EdgeInsets.all(12),
-                      child: SizedBox(
-                        height: 24,
-                        width: 24,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      ),
-                    );
-                  },
-                  errorBuilder: (_, __, ___) => _ImageLoadFallback(url: url),
-                ),
-              ),
+            child: _ImagePreview(
+              imageUrl: url,
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => _FullScreenImagePage(imageUrl: url),
+                  ),
+                );
+              },
             ),
           ),
         ),
@@ -616,7 +724,10 @@ class _QuestionCard extends StatelessWidget {
     );
   }
 
-  List<Widget> _buildOptions(List<Map<String, dynamic>> options) {
+  List<Widget> _buildOptions(
+    BuildContext context,
+    List<Map<String, dynamic>> options,
+  ) {
     if (options.isEmpty) return [const Text('Нет options')];
     return options.map((option) {
       final optionHtml =
@@ -654,7 +765,7 @@ class _QuestionCard extends StatelessWidget {
                 ),
               ),
             if (label != null && label.isNotEmpty) const Gap(4),
-            _htmlBlock(optionHtml),
+            _htmlBlock(context, optionHtml),
           ],
         ),
       );
@@ -662,6 +773,7 @@ class _QuestionCard extends StatelessWidget {
   }
 
   List<Widget> _buildMatchingRows(
+    BuildContext context,
     List<Map<String, dynamic>> rows,
     List<Map<String, dynamic>> options,
   ) {
@@ -717,7 +829,7 @@ class _QuestionCard extends StatelessWidget {
                   color: AppColors.white,
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: _htmlBlock(left),
+                child: _htmlBlock(context, left),
               ),
             ),
             const Padding(
@@ -744,7 +856,7 @@ class _QuestionCard extends StatelessWidget {
                   borderRadius: BorderRadius.circular(10),
                   border: Border.all(color: const Color(0xFFD8DEEB)),
                 ),
-                child: _htmlBlock(right),
+                child: _htmlBlock(context, right),
               ),
             ),
           ],
